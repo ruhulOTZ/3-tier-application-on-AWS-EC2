@@ -127,7 +127,7 @@ On each of the three EC2 instances:
 ```bash
 sudo apt-get update -y
 sudo apt-get install -y git
-git clone <YOUR_GIT_REPO_URL> ~/app
+git clone https://github.com/ruhulOTZ/3-tier-application-on-AWS-EC2 ~/app
 cd ~/app
 ```
 
