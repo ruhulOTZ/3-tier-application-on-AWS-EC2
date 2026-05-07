@@ -98,7 +98,7 @@ The `README.md` in the repo root already references these filenames, so once the
 
 ## Pre-submission checklist
 
-- [ ] All 8 screenshots captured and committed
+- [ ] All 9 screenshots captured and committed (1, 2, 3, 4, 5, 6, 7, 7b, 8)
 - [ ] `README.md` renders cleanly on GitHub (visit your repo and check)
 - [ ] Repo URL is shareable (public, or shared with whoever's grading)
 - [ ] App is still reachable at `http://<PRESENTATION_PUBLIC_IP>/` at submission time

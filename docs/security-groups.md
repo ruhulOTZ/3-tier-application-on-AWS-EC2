@@ -65,31 +65,31 @@ This is what creates the "tier above me only" link — IPs of EC2 instances chan
 From the **Presentation** EC2 (#1):
 ```bash
 # Should succeed (App tier accepts from SG-Presentation)
-nc -vz <APP_PRIVATE_IP> 3001
+nc -vz 10.0.5.220 3001
 
 # Should fail / hang (Data tier does NOT accept from SG-Presentation)
-nc -vz <DATA_PRIVATE_IP> 5432   # expect timeout
+nc -vz 10.0.8.229 5432   # expect timeout
 ```
 
 From the **Application** EC2 (#2):
 ```bash
 # Should succeed (Data tier accepts from SG-Application)
-nc -vz <DATA_PRIVATE_IP> 5432
+nc -vz 10.0.8.229 5432
 ```
 
 From your **laptop**:
 ```bash
 # Should return 301 redirect to https
-curl -I http://<PRESENTATION_PUBLIC_IP>/
+curl -I http://43.205.240.192/
 # Expect:  HTTP/1.1 301 Moved Permanently
-#          Location: https://<PRESENTATION_PUBLIC_IP>/
+#          Location: https://43.205.240.192/
 
 # Should succeed (-k accepts the self-signed cert)
-curl -kI https://<PRESENTATION_PUBLIC_IP>/
+curl -kI https://43.205.240.192/
 # Expect:  HTTP/2 200
 
 # Should fail (App tier is not exposed to the internet)
-curl --max-time 5 http://<APP_PUBLIC_IP>:3001/api/health   # expect timeout
+curl --max-time 5 http://43.205.138.22:3001/api/health   # expect timeout
 ```
 
 If all four results match expectations, your tier separation is correct.

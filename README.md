@@ -62,10 +62,8 @@ A simple **Notes** web app deployed across three EC2 instances, with each tier r
 │   └── generate-ssl-cert.sh  # creates the self-signed TLS cert on EC2 #1
 └── docs/
     ├── security-groups.md    # detailed SG cheat-sheet + verification commands
-    └── screenshots-checklist.md  # what to capture for each of the 8 screenshots
+    └── screenshots-checklist.md  # what to capture for each of the 9 screenshots
 ```
-
-> See [`docs/security-groups.md`](docs/security-groups.md) for the security-group setup in more detail, and [`docs/screenshots-checklist.md`](docs/screenshots-checklist.md) for what each proof-of-work screenshot should contain.
 
 ---
 
@@ -164,7 +162,7 @@ sudo ./setup-pgadmin.sh
 
 The script will prompt you for a pgAdmin admin email and password. Pick anything you'll remember — this is just for logging into the pgAdmin web UI.
 
-After it finishes, set a password for the OS-level `postgres` Postgres role so pgAdmin can connect to it:
+After it finishes, set a password for the `postgres` database role so pgAdmin can connect to it via TCP/IP:
 
 ```bash
 sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'pick_a_strong_password';"
@@ -392,84 +390,57 @@ http://13.201.79.120/pgadmin4
 
 ## Screenshots (proof of work)
 
-> Replace each placeholder with a screenshot once you've verified the deployment. Save them in a `screenshots/` folder in the repo and reference them like `![desc](screenshots/file.png)`.
+All screenshots are stored in [`screenshots/`](screenshots/).
 
-1. **EC2 console** showing 3 running instances with their tags
-   `![3 EC2 instances](screenshots/01-ec2-instances.png)`
+### 1. EC2 console — 3 running instances
 
-2. **Security groups** showing the three SGs and their inbound rules
-   `![Security groups](screenshots/02-security-groups.png)`
+![3 EC2 instances](screenshots/01-ec2-instances.png)
 
-3. **Data tier** — `psql` output of `SELECT * FROM notes;` on EC2 #3
-   `![psql notes](screenshots/03-psql-notes.png)`
+### 2. Security groups — separation between tiers
 
-4. **Data tier** — pgAdmin web UI showing the `notes` table with rows
-   `![pgAdmin notes](screenshots/04-pgadmin-notes.png)`
+![Security groups](screenshots/02-security-groups.png)
 
-5. **Application tier** — `systemctl status notes-backend` showing it's active
-   `![systemd status](screenshots/05-backend-systemd.png)`
+### 3. Data tier — `psql` output of `SELECT * FROM notes;`
 
-6. **Application tier** — `curl http://localhost:3001/api/health` returning `status: ok`
-   `![api health](screenshots/06-api-health.png)`
+![psql notes](screenshots/03-psql-notes.png)
 
-7. **Presentation tier** — `nginx -t` success and the React app loaded in a browser
-   `![nginx + UI](screenshots/07-frontend-ui.png)`
+### 4. Data tier — pgAdmin web UI showing the `notes` table
 
-8. **End-to-end** — adding a note in the UI, then seeing it in pgAdmin
-   `![end-to-end](screenshots/08-end-to-end.png)`
+![pgAdmin notes](screenshots/04-pgadmin-notes.png)
 
----
+### 5. Application tier — PM2 process online
 
-## Troubleshooting
+![PM2 status](screenshots/05-backend-pm2.png)
 
-**Browser shows "Your connection is not private" warning**
-- Expected — the cert is self-signed. Click Advanced → Proceed anyway. The connection is still encrypted with TLS, the browser just doesn't trust the cert issuer (you).
+### 6. Application tier — API health check
 
-**Frontend loads but the health badge is red ("Could not fetch notes")**
-- On EC2 #1: `curl -k https://localhost/api/health` — if this fails, Nginx isn't reaching EC2 #2. Check `nginx-frontend.conf` `upstream` IP and SG-Application rule.
-- On EC2 #2: `pm2 logs notes-backend` — look for DB connection errors.
+![api health](screenshots/06-api-health.png)
 
-**HTTPS doesn't work / `nginx -t` fails after copying the config**
-- Did you run `generate-ssl-cert.sh` first? Check `ls -la /etc/ssl/notes/` — both `notes.crt` and `notes.key` must exist.
-- Check Nginx error log: `sudo tail -n 50 /var/log/nginx/error.log`
+### 7. Presentation tier — Nginx + React UI over HTTPS
 
-**API returns 500 on `/api/health`**
-- DB unreachable. On EC2 #2: `psql -h <DATA_PRIVATE_IP> -U notesuser -d notesdb` (use the password from `.env`). If this fails:
-  - Check `pg_hba.conf` has the App-tier CIDR allowed
-  - Check `listen_addresses = '*'` in `postgresql.conf`
-  - Check SG-Data inbound rule for port 5432 from SG-Application
+![nginx + UI](screenshots/07-frontend-ui.png)
 
-**pgAdmin shows "Internal Server Error"**
-- Apache likely needs a restart: `sudo systemctl restart apache2`
-- Make sure you ran `sudo /usr/pgadmin4/bin/setup-web.sh` after install
+### 7b. HTTP → HTTPS redirect
 
-**SSH not working to a tier**
-- Verify port 22 is allowed from your IP in that tier's SG
-- Verify the key pair: `ssh -i your-key.pem ubuntu@<public-ip>`
+![HTTP redirect](screenshots/07b-http-redirect.png)
 
----
+### 8. End-to-end — note added in UI, visible in pgAdmin
 
-## Notes & design choices
-
-- **No Docker** — every service runs as a native package or systemd unit, per the assignment constraint of using only EC2.
-- **Private IPs between tiers** — the API only ever talks to the DB over its private IP, and Nginx talks to the API over its private IP. This keeps DB and API off the public internet.
-- **`.env` is gitignored** — never commit secrets. `backend/.env.example` is the template.
-- **Nginx as the single internet-facing surface** — only EC2 #1 has 80/443 open to the world. The API is reached by clients indirectly through `/api/*`.
-- **TLS terminates at Nginx** — the Presentation tier handles HTTPS with a self-signed cert. Inside the VPC the API and DB hops are plain HTTP/TCP, which is fine because they're over private IPs and locked to specific security groups. For a real production deploy you'd swap the self-signed cert for Let's Encrypt (with a domain) or AWS ACM behind an ALB.
+![end-to-end](screenshots/08-end-to-end.png)
 
 ---
 
 ## Submission checklist
 
-- [ ] All three EC2 instances running and reachable
-- [ ] Security groups configured per the tables above
-- [ ] `setup-postgres.sh` ran cleanly on EC2 #3
-- [ ] pgAdmin web UI accessible at `http://<DATA_PUBLIC_IP>/pgadmin4`
-- [ ] `notes-backend` is `online` under PM2 on EC2 #2 (`pm2 status`)
-- [ ] React build deployed to `/var/www/notes-frontend` on EC2 #1
-- [ ] Self-signed TLS cert generated at `/etc/ssl/notes/`
-- [ ] `nginx -t` succeeds and Nginx reloaded
-- [ ] App opens at `https://<PRESENTATION_PUBLIC_IP>/` with green health badge (after accepting the self-signed-cert warning)
-- [ ] `http://<PRESENTATION_PUBLIC_IP>/` returns a 301 redirect to `https://`
-- [ ] All 8 screenshots captured under `screenshots/`
-- [ ] Repo pushed to git with this README at the root
+- [x] All three EC2 instances running and reachable
+- [x] Security groups configured per the tables above
+- [x] `setup-postgres.sh` ran cleanly on EC2 #3
+- [x] pgAdmin web UI accessible at `http://13.201.79.120/pgadmin4`
+- [x] `notes-backend` is `online` under PM2 on EC2 #2 (`pm2 status`)
+- [x] React build deployed to `/var/www/notes-frontend` on EC2 #1
+- [x] Self-signed TLS cert generated at `/etc/ssl/notes/`
+- [x] `nginx -t` succeeds and Nginx reloaded
+- [x] App opens at `https://43.205.240.192/` with green health badge (after accepting the self-signed-cert warning)
+- [x] `http://43.205.240.192/` returns a 301 redirect to `https://`
+- [x] All 9 screenshots captured under `screenshots/`
+- [x] Repo pushed to git with this README at the root
