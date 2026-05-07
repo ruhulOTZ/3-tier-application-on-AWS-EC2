@@ -15,7 +15,7 @@ set -euo pipefail
 DB_NAME="notesdb"
 DB_USER="notesuser"
 DB_PASSWORD="change_me_strong_password"   # match backend/.env
-APP_TIER_CIDR="10.0.0.0/16"               # VPC CIDR (or the App-tier private IP /32)
+APP_TIER_CIDR="10.0.0.0/16"               # VPC CIDR for vpc-0455b18f4ad024c52 (covers App tier 10.0.5.220)
 # ------------------------------------------------------------------------------
 
 echo "[1/5] Installing PostgreSQL..."

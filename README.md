@@ -77,13 +77,15 @@ A simple **Notes** web app deployed across three EC2 instances, with each tier r
 - A key pair `.pem` file with permissions `chmod 400 your-key.pem`
 - The public IPs of all 3 instances and the private IP of EC2 #2 and EC2 #3
 
-> **Tip:** Note down these values now — you'll paste them into config files later.
+> **Deployment IPs for this submission:**
 >
-> | Instance | Public IP | Private IP |
-> |---|---|---|
-> | EC2 #1 (Presentation) | _________ | _________ |
-> | EC2 #2 (Application)  | _________ | _________ |
-> | EC2 #3 (Data)         | _________ | _________ |
+> | Instance              | Public IP        | Private IP   |
+> |-----------------------|------------------|--------------|
+> | EC2 #1 (Presentation) | `43.205.240.192` | `10.0.14.106`|
+> | EC2 #2 (Application)  | `43.205.138.22`  | `10.0.5.220` |
+> | EC2 #3 (Data)         | `13.201.79.120`  | `10.0.8.229` |
+>
+> Region: `ap-south-1` (Mumbai). All three are in VPC `vpc-0455b18f4ad024c52`.
 
 ## Security Group rules
 
@@ -174,7 +176,7 @@ sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'pick_a_strong_passw
 Open in your browser:
 
 ```
-http://<DATA_EC2_PUBLIC_IP>/pgadmin4
+http://13.201.79.120/pgadmin4
 ```
 
 Log in with the admin email/password you set. Then register a server:
@@ -214,7 +216,7 @@ Set:
 
 ```
 PORT=3001
-DB_HOST=<PRIVATE_IP_OF_DATA_EC2>     # e.g. 172.31.20.30
+DB_HOST=10.0.8.229                   # private IP of EC2 #3 (Data tier)
 DB_PORT=5432
 DB_NAME=notesdb
 DB_USER=notesuser
@@ -300,7 +302,7 @@ sudo PUBLIC_IP_OVERRIDE=<EC2#1_PUBLIC_IP> ./generate-ssl-cert.sh
 sudo cp ~/app/deployment/nginx-frontend.conf /etc/nginx/sites-available/notes-frontend
 # Edit the upstream line and replace APP_TIER_HOST with the *private* IP of EC2 #2
 sudo nano /etc/nginx/sites-available/notes-frontend
-#   server APP_TIER_HOST:3001;   ->   server 172.31.10.20:3001;
+#   server APP_TIER_HOST:3001;   ->   server 10.0.5.220:3001;
 
 sudo ln -sf /etc/nginx/sites-available/notes-frontend /etc/nginx/sites-enabled/notes-frontend
 sudo rm -f /etc/nginx/sites-enabled/default
@@ -315,7 +317,7 @@ sudo systemctl reload nginx
 Open in your browser:
 
 ```
-https://<PRESENTATION_EC2_PUBLIC_IP>/
+https://43.205.240.192/
 ```
 
 > **First-visit warning:** Because the cert is self-signed, your browser will show a "Your connection is not private" / "Not secure" warning. Click **Advanced → Proceed anyway** (Chrome) or **Advanced → Accept the Risk and Continue** (Firefox). This warning is expected and does not mean anything is broken — it just means the cert wasn't issued by a public CA. The connection itself is encrypted with TLS.
@@ -329,26 +331,26 @@ You should see the **3-Tier Notes** UI with:
 Plain `http://...` requests are auto-redirected to HTTPS (HTTP 301) by Nginx. Test it:
 
 ```bash
-curl -I http://<PRESENTATION_EC2_PUBLIC_IP>/
+curl -I http://43.205.240.192/
 # HTTP/1.1 301 Moved Permanently
-# Location: https://<PRESENTATION_EC2_PUBLIC_IP>/
+# Location: https://43.205.240.192/
 ```
 
 API can also be reached directly via Nginx (use `-k` so curl accepts the self-signed cert):
 
 ```
-https://<PRESENTATION_EC2_PUBLIC_IP>/api/health
-https://<PRESENTATION_EC2_PUBLIC_IP>/api/notes
+https://43.205.240.192/api/health
+https://43.205.240.192/api/notes
 ```
 
 ```bash
-curl -k https://<PRESENTATION_EC2_PUBLIC_IP>/api/health
+curl -k https://43.205.240.192/api/health
 ```
 
 pgAdmin is reachable at (still HTTP — internal admin only, restricted to your IP):
 
 ```
-http://<DATA_EC2_PUBLIC_IP>/pgadmin4
+http://13.201.79.120/pgadmin4
 ```
 
 ---
