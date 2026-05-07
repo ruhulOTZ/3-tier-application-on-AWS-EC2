@@ -336,15 +336,14 @@ sudo PUBLIC_IP_OVERRIDE=<EC2#1_PUBLIC_IP> ./generate-ssl-cert.sh
 
 ```bash
 sudo cp ~/app/deployment/nginx-frontend.conf /etc/nginx/sites-available/notes-frontend
-# Edit the upstream line and replace APP_TIER_HOST with the *private* IP of EC2 #2
-sudo nano /etc/nginx/sites-available/notes-frontend
-#   server APP_TIER_HOST:3001;   ->   server 10.0.5.220:3001;
 
 sudo ln -sf /etc/nginx/sites-available/notes-frontend /etc/nginx/sites-enabled/notes-frontend
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t                     # should report "syntax is ok / test is successful"
 sudo systemctl reload nginx
 ```
+
+> The upstream IP (`10.0.5.220` — private IP of EC2 #2) is already baked into `nginx-frontend.conf`. If you ever redeploy with different IPs, edit the `upstream notes_app { server <ip>:3001; }` block before copying.
 
 ---
 
