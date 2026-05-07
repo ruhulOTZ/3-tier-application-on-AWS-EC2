@@ -33,14 +33,17 @@ Tick each box once you've captured the screenshot and saved it to `screenshots/`
 - **Make sure visible:** the URL bar (so the marker says you accessed it via web), the tree on the left, and the data grid showing the rows.
 - **Why:** Proves pgAdmin is installed in **web** mode (the assignment specifically asked for pgAdmin in web).
 
-## 5. Application tier — systemd unit active
-- [ ] **File:** `screenshots/05-backend-systemd.png`
-- **What to capture:** SSH into EC2 #2 and run:
+## 5. Application tier — PM2 process running
+- [ ] **File:** `screenshots/05-backend-pm2.png`
+- **What to capture:** SSH into EC2 #2 and run, in this order, capturing both in one terminal screenshot:
   ```bash
-  sudo systemctl status notes-backend --no-pager
+  pm2 status
+  pm2 logs notes-backend --lines 15 --nostream
   ```
-- **Make sure visible:** `Active: active (running)` line in green, the unit file path, recent journal lines including `Notes API listening on 0.0.0.0:3001` and the `DB target:` line.
-- **Why:** Proves the backend runs as a managed service, not just a one-off `node` command.
+- **Make sure visible:**
+  - In `pm2 status`: a row for `notes-backend` with status `online`, non-zero uptime, restart count, and CPU/memory usage.
+  - In the logs: the `Notes API listening on 0.0.0.0:3001` line and the `DB target: 10.0.8.229:5432/notesdb` line.
+- **Why:** Proves the backend runs as a managed process that auto-restarts on crash/reboot, not just a one-off `node` command.
 
 ## 6. Application tier — API health check
 - [ ] **File:** `screenshots/06-api-health.png`

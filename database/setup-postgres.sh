@@ -3,7 +3,8 @@
 # Data Tier setup script - runs on the Data EC2 (Ubuntu 22.04 / 24.04)
 #
 # Installs PostgreSQL natively (no Docker), creates the application database
-# and user, and applies the schema from init.sql.
+# and user, applies the schema from init.sql, and transfers ownership of
+# the application tables to the app user so the API can read/write them.
 #
 # Usage (on the Data-tier EC2):
 #   chmod +x setup-postgres.sh
@@ -15,14 +16,14 @@ set -euo pipefail
 DB_NAME="notesdb"
 DB_USER="notesuser"
 DB_PASSWORD="change_me_strong_password"   # match backend/.env
-APP_TIER_CIDR="10.0.0.0/16"               # VPC CIDR for vpc-0455b18f4ad024c52 (covers App tier 10.0.5.220)
+APP_TIER_CIDR="10.0.0.0/16"               # VPC CIDR (covers App tier private IP)
 # ------------------------------------------------------------------------------
 
-echo "[1/5] Installing PostgreSQL..."
+echo "[1/6] Installing PostgreSQL..."
 apt-get update -y
 apt-get install -y postgresql postgresql-contrib
 
-echo "[2/5] Creating database and user..."
+echo "[2/6] Creating database and user..."
 sudo -u postgres psql -v ON_ERROR_STOP=1 <<SQL
 DO \$\$
 BEGIN
@@ -36,10 +37,17 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${DB_NAME}')\gexec
 GRANT ALL PRIVILEGES ON DATABASE ${DB_NAME} TO ${DB_USER};
 SQL
 
-echo "[3/5] Applying schema from init.sql..."
+echo "[3/6] Applying schema from init.sql..."
 sudo -u postgres psql -d "${DB_NAME}" -f "$(dirname "$0")/init.sql"
 
-echo "[4/5] Configuring PostgreSQL to accept remote connections from the App tier..."
+echo "[4/6] Transferring table ownership to ${DB_USER} so the app role can read/write..."
+sudo -u postgres psql -d "${DB_NAME}" <<SQL
+ALTER TABLE notes          OWNER TO ${DB_USER};
+ALTER SEQUENCE notes_id_seq OWNER TO ${DB_USER};
+GRANT ALL ON SCHEMA public  TO ${DB_USER};
+SQL
+
+echo "[5/6] Configuring PostgreSQL to accept remote connections from the App tier..."
 PG_VERSION="$(ls /etc/postgresql/ | head -n1)"
 PG_CONF="/etc/postgresql/${PG_VERSION}/main/postgresql.conf"
 HBA_CONF="/etc/postgresql/${PG_VERSION}/main/pg_hba.conf"
@@ -51,7 +59,7 @@ sed -i "s/^#*listen_addresses *=.*/listen_addresses = '*'/" "${PG_CONF}"
 HBA_LINE="host    ${DB_NAME}    ${DB_USER}    ${APP_TIER_CIDR}    md5"
 grep -qF "${HBA_LINE}" "${HBA_CONF}" || echo "${HBA_LINE}" >> "${HBA_CONF}"
 
-echo "[5/5] Restarting PostgreSQL..."
+echo "[6/6] Restarting PostgreSQL..."
 systemctl restart postgresql
 systemctl enable postgresql
 

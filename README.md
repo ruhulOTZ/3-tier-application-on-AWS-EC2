@@ -59,8 +59,7 @@ A simple **Notes** web app deployed across three EC2 instances, with each tier r
 │   └── setup-pgadmin.sh      # native install of pgAdmin4 web mode
 ├── deployment/
 │   ├── nginx-frontend.conf   # Nginx site config for EC2 #1 (HTTPS + redirect)
-│   ├── generate-ssl-cert.sh  # creates the self-signed TLS cert on EC2 #1
-│   └── notes-backend.service # systemd unit for the API on EC2 #2
+│   └── generate-ssl-cert.sh  # creates the self-signed TLS cert on EC2 #1
 └── docs/
     ├── security-groups.md    # detailed SG cheat-sheet + verification commands
     └── screenshots-checklist.md  # what to capture for each of the 8 screenshots
@@ -234,19 +233,56 @@ curl http://localhost:3001/api/health
 
 Press `Ctrl+C` to stop.
 
-**2.5 — Run as a systemd service (so it survives reboots)**
+**2.5 — Run with PM2 (so it survives reboots)**
+
+PM2 is a process manager for Node.js. It keeps the API alive after crashes, restarts it on boot, and provides handy log/monitoring commands.
 
 ```bash
-sudo cp ~/app/deployment/notes-backend.service /etc/systemd/system/notes-backend.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now notes-backend
-sudo systemctl status notes-backend
+# Install PM2 globally
+sudo npm install -g pm2
+
+# Start the API from the backend directory (so .env is found)
+cd ~/app/backend
+pm2 start server.js --name notes-backend
+
+# Confirm it's online
+pm2 status
+pm2 logs notes-backend --lines 30
 ```
 
-Logs:
+You should see `notes-backend` in `online` state, and the logs should print:
+```
+Notes API listening on 0.0.0.0:3001
+DB target: 10.0.8.229:5432/notesdb
+```
+
+**Make PM2 start on boot:**
 
 ```bash
-sudo journalctl -u notes-backend -f
+# Save current process list as the boot manifest
+pm2 save
+
+# Generate the systemd unit that brings PM2 up on boot
+pm2 startup systemd -u ubuntu --hp /home/ubuntu
+```
+
+The `pm2 startup` command prints a `sudo env PATH=...` line — **copy and run that exact command** to actually install the unit.
+
+**Verify reboot survival (optional but proves it works):**
+
+```bash
+sudo reboot
+# wait ~30s, SSH back in
+pm2 status     # notes-backend should be 'online' again automatically
+```
+
+**Useful PM2 commands while debugging:**
+
+```bash
+pm2 logs notes-backend          # tail live logs
+pm2 logs notes-backend --err    # only stderr
+pm2 restart notes-backend       # after editing code
+pm2 monit                       # interactive CPU/mem monitor
 ```
 
 ---
@@ -392,7 +428,7 @@ http://13.201.79.120/pgadmin4
 
 **Frontend loads but the health badge is red ("Could not fetch notes")**
 - On EC2 #1: `curl -k https://localhost/api/health` — if this fails, Nginx isn't reaching EC2 #2. Check `nginx-frontend.conf` `upstream` IP and SG-Application rule.
-- On EC2 #2: `sudo journalctl -u notes-backend -f` — look for DB connection errors.
+- On EC2 #2: `pm2 logs notes-backend` — look for DB connection errors.
 
 **HTTPS doesn't work / `nginx -t` fails after copying the config**
 - Did you run `generate-ssl-cert.sh` first? Check `ls -la /etc/ssl/notes/` — both `notes.crt` and `notes.key` must exist.
@@ -430,7 +466,7 @@ http://13.201.79.120/pgadmin4
 - [ ] Security groups configured per the tables above
 - [ ] `setup-postgres.sh` ran cleanly on EC2 #3
 - [ ] pgAdmin web UI accessible at `http://<DATA_PUBLIC_IP>/pgadmin4`
-- [ ] `notes-backend` systemd service is `active (running)` on EC2 #2
+- [ ] `notes-backend` is `online` under PM2 on EC2 #2 (`pm2 status`)
 - [ ] React build deployed to `/var/www/notes-frontend` on EC2 #1
 - [ ] Self-signed TLS cert generated at `/etc/ssl/notes/`
 - [ ] `nginx -t` succeeds and Nginx reloaded
